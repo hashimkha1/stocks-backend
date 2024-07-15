@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-i_n!)%z)!jx$_-9pk8!41b=)+ubs5wj&p8a0x8r%4r=9ilx&&5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-# ALLOWED_HOSTS = ['discipleshiptrails.com']
+#ALLOWED_HOSTS = ['discipleshiptrails.com']
 ALLOWED_HOSTS = []
 
 
@@ -56,7 +56,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 CORS_ALLOWED_ORIGINS = [
-    # "https://discipleshiptrails.com",
+    #"https://discipleshiptrails.com",
     "http://localhost:3000"
    
 ]

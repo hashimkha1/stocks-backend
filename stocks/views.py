@@ -1,15 +1,14 @@
 # views.py
 from rest_framework import viewsets
 from .models import Stock
-from rest_framework.response import Response
 from rest_framework import generics, permissions
-from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
-from rest_framework import status
-from rest_framework.views import APIView
-from .serializers import UserSerializer, RegisterSerializer,StockSerializer,ChangePasswordSerializer
-from django.contrib.auth import authenticate
-from rest_framework.permissions import IsAuthenticated
+from .serializers import UserSerializer, RegisterSerializer,StockSerializer
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.hashers import check_password, make_password
+import json
+from .models import UserPassword
 
 class StockViewSet(viewsets.ModelViewSet):
     queryset = Stock.objects.all()
@@ -19,31 +18,43 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = RegisterSerializer
 
-class LogoutView(generics.GenericAPIView):
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def post(self, request):
-        try:
-            refresh_token = request.data["refresh"]
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-            return Response(status=204)
-        except Exception as e:
-            return Response(status=400)
-class ChangePasswordView(APIView):
-    permission_classes = (IsAuthenticated,)
-
-    def post(self, request, *args, **kwargs):
-        serializer = ChangePasswordSerializer(data=request.data)
-        if serializer.is_valid():
-            old_password = serializer.data.get("old_password")
-            new_password = serializer.data.get("new_password")
-            user = authenticate(username=request.user.username, password=old_password)
-            if user:
-                user.set_password(new_password)
-                user.save()
-                return Response({"status": "password set"}, status=status.HTTP_200_OK)
+@csrf_exempt
+def login(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        password = data.get('password')
+        user_password = UserPassword.objects.first()
+        if user_password:
+            # Check if the stored password is hashed
+            if user_password.password.startswith('pbkdf2_'):
+                if check_password(password, user_password.password):
+                    return JsonResponse({'message': 'Login successful'}, status=200)
             else:
-                return Response({"old_password": ["Wrong password."]}, status=status.HTTP_400_BAD_REQUEST)
+                # If the password is not hashed, compare directly and update it to a hashed version
+                if user_password.password == password:
+                    user_password.password = make_password(password)
+                    user_password.save()
+                    return JsonResponse({'message': 'Login successful'}, status=200)
+        return JsonResponse({'message': 'Invalid password'}, status=401)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)        
+@csrf_exempt
+def change_password(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        old_password = data.get('old_password')
+        new_password = data.get('new_password')
+        user_password = UserPassword.objects.first()
+        if user_password:
+            # Check if the stored password is hashed
+            if user_password.password.startswith('pbkdf2_'):
+                if check_password(old_password, user_password.password):
+                    user_password.password = make_password(new_password)
+                    user_password.save()
+                    return JsonResponse({'message': 'Password changed successfully'}, status=200)
+            else:
+                # If the password is not hashed, compare directly and update it to a hashed version
+                if user_password.password == old_password:
+                    user_password.password = make_password(new_password)
+                    user_password.save()
+                    return JsonResponse({'message': 'Password changed successfully'}, status=200)
+        return JsonResponse({'message': 'Invalid old password'}, status=401)
